@@ -1,0 +1,15 @@
+# Allgemeine Konfiguration des Listeners (getrennt von keywords.yaml).
+
+# Kuratierte Subreddit-Liste, die durchsucht wird, solange search_all: false ist.
+# Wird als "sub1+sub2+sub3" an die Reddit-API uebergeben (Multi-Subreddit-Listing).
+subreddits:
+  - Zotero
+  - AskAcademia
+  - PhD
+  - GradSchool
+  - labrats
+
+# Wenn true: durchsucht ganz Reddit (r/all) statt der obigen Liste.
+# Mehr Treffer, aber auch mehr Rauschen und mehr Last auf Reddits Rate-Limits.
+# Standard: false (kuratierte Liste), wie in der Anleitung empfohlen.
+search_all: false

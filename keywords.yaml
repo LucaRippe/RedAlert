@@ -1,0 +1,51 @@
+# Keyword-Konfiguration fuer den Reddit-Listener.
+#
+# Jeder Eintrag ist eine Gruppe. Ein Treffer entsteht, wenn IRGENDEINE Phrase aus
+# `match_any` als Teilstring im Text vorkommt (Titel+Body bei Posts, Body bei
+# Kommentaren) UND KEINE Phrase aus `exclude_any` vorkommt.
+#
+# - match_any: Liste von Phrasen, mindestens eine muss treffen (Teilstring, nicht
+#   nur ganzes Wort)
+# - exclude_any: optional, Phrasen die den Treffer unterdruecken auch wenn match_any
+#   getroffen hat
+# - case_sensitive: optional, Standard false (Gross-/Kleinschreibung wird ignoriert)
+#
+# Diese Datei kannst du beliebig erweitern, ohne Code anzufassen - einfach neue
+# Eintraege nach demselben Muster hinzufuegen.
+
+- name: "Litmaps Alternative"
+  match_any:
+    - "litmaps alternative"
+    - "alternative to litmaps"
+  case_sensitive: false
+
+- name: "ResearchRabbit Alternative"
+  match_any:
+    - "researchrabbit alternative"
+    - "research rabbit alternative"
+  case_sensitive: false
+
+- name: "Connected Papers Alternative"
+  match_any:
+    - "connected papers alternative"
+  case_sensitive: false
+
+- name: "Zotero Citation Map"
+  match_any:
+    - "zotero citation map"
+    - "citation map zotero"
+  case_sensitive: false
+
+- name: "Brand Mention"
+  match_any:
+    - "orblit"
+  case_sensitive: false
+
+- name: "Generic Lit Review Pain"
+  match_any:
+    - "literature review tool"
+    - "systematic review tool"
+  exclude_any:
+    - "job posting"
+    - "hiring"
+  case_sensitive: false

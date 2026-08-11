@@ -1,0 +1,49 @@
+name: Reddit Keyword Monitor
+
+on:
+  schedule:
+    # Alle 45 Minuten. Nicht haeufiger als alle 15-30 Minuten stellen, um
+    # Reddits Rate-Limits nicht zu strapazieren.
+    - cron: "*/45 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Verhindert ueberlappende Laeufe (z. B. manueller Trigger waehrend ein
+# geplanter Lauf noch aktiv ist), damit seen_ids.json nicht in einer
+# Race Condition ueberschrieben wird.
+concurrency:
+  group: reddit-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencies installieren
+        run: pip install -r requirements.txt
+
+      - name: Monitor ausfuehren
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python src/monitor.py
+
+      - name: seen_ids.json committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_ids.json
+          git diff --staged --quiet || git commit -m "chore: update seen_ids.json [skip ci]"
+          git push
