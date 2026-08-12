@@ -18,44 +18,156 @@
 # automatisch zu einer eigenen Gruppe (Name = die Phrase selbst, match_any = nur
 # diese eine Phrase, kein exclude_any, case-insensitiv). Praktisch zum schnellen
 # Ausprobieren einzelner Woerter, ohne die name/match_any-Struktur auszufuellen.
-# Siehe Beispiel ganz unten in dieser Datei.
+# Siehe Ad-hoc-Block ganz unten in dieser Datei.
+
+# --- Konkrete Konkurrenz-Alternativen -------------------------------------
 
 - name: "Litmaps Alternative"
   match_any:
     - "litmaps alternative"
     - "alternative to litmaps"
-  case_sensitive: false
 
 - name: "ResearchRabbit Alternative"
   match_any:
     - "researchrabbit alternative"
     - "research rabbit alternative"
-  case_sensitive: false
+    - "alternative to researchrabbit"
+    - "alternative to research rabbit"
 
 - name: "Connected Papers Alternative"
   match_any:
     - "connected papers alternative"
-  case_sensitive: false
+    - "alternative to connected papers"
 
 - name: "Zotero Citation Map"
   match_any:
     - "zotero citation map"
     - "citation map zotero"
-  case_sensitive: false
 
-- name: "Brand Mention"
+- name: "Scite Alternative"
   match_any:
-    - "orblit"
-  case_sensitive: false
+    - "scite alternative"
+    - "alternative to scite"
+
+- name: "Elicit Alternative"
+  match_any:
+    - "elicit alternative"
+    - "alternative to elicit"
+
+- name: "Consensus App Alternative"
+  match_any:
+    - "consensus app alternative"
+    - "alternative to consensus app"
+
+- name: "Semantic Scholar Alternative"
+  match_any:
+    - "semantic scholar alternative"
+    - "alternative to semantic scholar"
+
+- name: "Inciteful Alternative"
+  match_any:
+    - "inciteful alternative"
+    - "alternative to inciteful"
+
+- name: "Paperpile Alternative"
+  match_any:
+    - "paperpile alternative"
+    - "alternative to paperpile"
+
+- name: "Mendeley Alternative"
+  match_any:
+    - "mendeley alternative"
+    - "alternative to mendeley"
+  exclude_any:
+    - "job posting"
+    - "hiring"
+
+- name: "EndNote Alternative"
+  match_any:
+    - "endnote alternative"
+    - "alternative to endnote"
+
+- name: "Scholarcy Alternative"
+  match_any:
+    - "scholarcy alternative"
+    - "alternative to scholarcy"
+
+- name: "Open Knowledge Maps Alternative"
+  match_any:
+    - "open knowledge maps alternative"
+    - "alternative to open knowledge maps"
+
+- name: "VOSviewer Alternative"
+  match_any:
+    - "vosviewer alternative"
+    - "alternative to vosviewer"
+
+# --- Direkte Tool-Vergleiche (Diskussionen mit Kaufabsicht) ---------------
+
+- name: "Tool Comparison Thread"
+  match_any:
+    - "litmaps vs researchrabbit"
+    - "researchrabbit vs litmaps"
+    - "litmaps vs connected papers"
+    - "connected papers vs litmaps"
+    - "researchrabbit vs connected papers"
+    - "connected papers vs researchrabbit"
+    - "litmaps or researchrabbit"
+    - "researchrabbit or litmaps"
+    - "litmaps or connected papers"
+    - "researchrabbit or connected papers"
+
+# --- Generische Schmerzpunkte / Feature-Suche (keine Markennamen) ---------
 
 - name: "Generic Lit Review Pain"
   match_any:
     - "literature review tool"
     - "systematic review tool"
+    - "systematic review software"
+    - "literature review software"
   exclude_any:
     - "job posting"
     - "hiring"
-  case_sensitive: false
 
-# Beispiel fuer die Kurzform (Ad-hoc-Keyword ohne Gruppen-Boilerplate):
-# - "reference manager"
+- name: "Citation Mapping / Visualization"
+  match_any:
+    - "citation mapping tool"
+    - "citation visualization tool"
+    - "visualize citations"
+    - "citation network tool"
+    - "citation graph tool"
+    - "research map tool"
+    - "literature mapping tool"
+
+- name: "Related Papers Discovery"
+  match_any:
+    - "find related papers"
+    - "related papers tool"
+    - "paper recommendation tool"
+    - "papers that cite this paper"
+    - "find papers that cite"
+    - "backward citation search"
+    - "forward citation search"
+    - "citation chaining tool"
+    - "snowball search papers"
+    - "snowballing literature review"
+
+- name: "PRISMA / Systematic Review Workflow"
+  match_any:
+    - "prisma tool"
+    - "prisma flow diagram tool"
+    - "screening tool systematic review"
+    - "systematic review workflow"
+
+# --- Markenerwaehnung ------------------------------------------------------
+
+- name: "Brand Mention"
+  match_any:
+    - "orblit"
+
+# --- Ad-hoc-Keywords (Kurzform, ohne Gruppen-Boilerplate) -----------------
+
+- "reference manager"
+- "citation graph"
+- "paper discovery tool"
+- "research mapping"
