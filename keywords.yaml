@@ -39,10 +39,16 @@
     - "connected papers alternative"
     - "alternative to connected papers"
 
-- name: "Zotero Citation Map"
+- name: "Zotero Visualization / Network"
   match_any:
     - "zotero citation map"
     - "citation map zotero"
+    - "zotero visualization"
+    - "zotero related papers"
+    - "zotero network graph"
+    - "zotero literature map"
+    - "visualize zotero library"
+    - "zotero plugin recommendation"
 
 - name: "Scite Alternative"
   match_any:
@@ -103,19 +109,36 @@
     - "alternative to vosviewer"
 
 # --- Direkte Tool-Vergleiche (Diskussionen mit Kaufabsicht) ---------------
+# Bewusst breit gehalten (nur "<tool> vs", nicht auf bestimmte Gegner-Tools
+# eingeschraenkt) - faengt damit auch Vergleiche mit Tools ab, an die wir nicht
+# gedacht haben, nicht nur die drei Hauptkonkurrenten untereinander.
 
 - name: "Tool Comparison Thread"
   match_any:
-    - "litmaps vs researchrabbit"
-    - "researchrabbit vs litmaps"
-    - "litmaps vs connected papers"
-    - "connected papers vs litmaps"
-    - "researchrabbit vs connected papers"
-    - "connected papers vs researchrabbit"
+    - "litmaps vs"
+    - "researchrabbit vs"
+    - "research rabbit vs"
+    - "connected papers vs"
     - "litmaps or researchrabbit"
     - "researchrabbit or litmaps"
     - "litmaps or connected papers"
     - "researchrabbit or connected papers"
+
+# --- Wechsel-/Frustrationssignale (Nutzer aktiv unzufrieden mit Konkurrenz) --
+# Seltener, aber hochwertig: wer sich oeffentlich ueber ein Konkurrenzprodukt
+# beschwert, ist oft kurz vor einem Wechsel.
+
+- name: "Competitor Frustration Signal"
+  match_any:
+    - "litmaps too expensive"
+    - "litmaps pricing"
+    - "cancelled litmaps"
+    - "cancelled my litmaps"
+    - "researchrabbit down"
+    - "researchrabbit not working"
+    - "researchrabbit is down"
+    - "connected papers limit"
+    - "connected papers not working"
 
 # --- Generische Schmerzpunkte / Feature-Suche (keine Markennamen) ---------
 
