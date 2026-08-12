@@ -165,9 +165,10 @@ def main() -> int:
     checked_count = 0
     alert_count = 0
 
-    # --- Kommentare zuerst (Diagnose: comments.rss scheiterte bislang immer,
-    # wenn es nach new.rss kam - testet, ob es an der Reihenfolge/einem
-    # Budget-pro-Lauf-Effekt liegt) ---
+    # --- Kommentare zuerst ---
+    # Live beobachtet: 429s treffen eher den zweiten Request kurz nacheinander,
+    # nicht einen bestimmten Endpunkt fest - die Retry-Logik in fetch_feed faengt
+    # das zuverlaessig ab. Reihenfolge hier ist daher nicht kritisch.
     comments = fetch_feed(f"/r/{subreddit_path}/comments.rss", user_agent, COMMENT_LIMIT)
     for comment in comments:
         comment_id = comment["id"] or comment["link"]
