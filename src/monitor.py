@@ -165,6 +165,33 @@ def main() -> int:
     checked_count = 0
     alert_count = 0
 
+    # --- Kommentare zuerst (Diagnose: comments.rss scheiterte bislang immer,
+    # wenn es nach new.rss kam - testet, ob es an der Reihenfolge/einem
+    # Budget-pro-Lauf-Effekt liegt) ---
+    comments = fetch_feed(f"/r/{subreddit_path}/comments.rss", user_agent, COMMENT_LIMIT)
+    for comment in comments:
+        comment_id = comment["id"] or comment["link"]
+        if not comment_id or comment_id in seen_ids_set:
+            continue
+        seen_ids_set.add(comment_id)
+        seen_ids_list.append(comment_id)
+        checked_count += 1
+
+        for group_name in find_matches(comment["content"], groups):
+            send_alert(
+                bot_token,
+                chat_id,
+                keyword_group=group_name,
+                subreddit=comment["subreddit"],
+                kind="comment",
+                title_or_excerpt=comment["content"],
+                url=comment["link"],
+                author=comment["author"],
+            )
+            alert_count += 1
+
+    time.sleep(DELAY_BETWEEN_REQUESTS)
+
     # --- Posts (Titel + Body) ---
     posts = fetch_feed(f"/r/{subreddit_path}/new.rss", user_agent, POST_LIMIT)
     for post in posts:
@@ -186,31 +213,6 @@ def main() -> int:
                 title_or_excerpt=post["title"],
                 url=post["link"],
                 author=post["author"],
-            )
-            alert_count += 1
-
-    time.sleep(DELAY_BETWEEN_REQUESTS)
-
-    # --- Kommentare ---
-    comments = fetch_feed(f"/r/{subreddit_path}/comments.rss", user_agent, COMMENT_LIMIT)
-    for comment in comments:
-        comment_id = comment["id"] or comment["link"]
-        if not comment_id or comment_id in seen_ids_set:
-            continue
-        seen_ids_set.add(comment_id)
-        seen_ids_list.append(comment_id)
-        checked_count += 1
-
-        for group_name in find_matches(comment["content"], groups):
-            send_alert(
-                bot_token,
-                chat_id,
-                keyword_group=group_name,
-                subreddit=comment["subreddit"],
-                kind="comment",
-                title_or_excerpt=comment["content"],
-                url=comment["link"],
-                author=comment["author"],
             )
             alert_count += 1
 
