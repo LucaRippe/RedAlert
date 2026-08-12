@@ -50,9 +50,13 @@ COMMENT_LIMIT = 100
 REQUEST_TIMEOUT = 15
 DELAY_BETWEEN_REQUESTS = 5  # Sekunden Pause zwischen den beiden Requests, aus
 # Ruecksicht auf das strengere, undokumentierte Rate-Limiting unauthentifizierter
-# Zugriffe (beim Testen wurde nach mehreren schnellen Anfragen kurzzeitig ein
-# HTTP 429 beobachtet; bei einem Lauf alle 45 Minuten mit nur 2 Requests ist das
-# unkritisch, die Pause ist trotzdem ein guter Nachbar).
+# Zugriffe.
+MAX_RETRIES = 2  # zusaetzliche Versuche bei HTTP 429, bevor aufgegeben wird
+RETRY_WAIT_FALLBACK = 15  # Sekunden, falls Reddit keinen Retry-After-Header schickt
+RETRY_WAIT_CAP = 60  # nie laenger als das warten, auch wenn Retry-After mehr verlangt
+# In der Praxis (GitHub-Actions-Runner teilen sich IP-Adressen mit vielen anderen
+# Workflows) kam HTTP 429 haeufiger vor als bei lokalen Tests - deshalb ein
+# begrenzter Retry mit Backoff statt sofort aufzugeben.
 
 BASE_URL = "https://www.reddit.com"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
@@ -95,19 +99,39 @@ def fetch_feed(path: str, user_agent: str, limit: int) -> list[dict]:
 
     Gibt bei Fehlern (Netzwerk, Rate-Limit, kaputtes XML) eine leere Liste
     zurueck statt den ganzen Lauf abzubrechen - ein einzelner fehlgeschlagener
-    Request soll den Rest des Durchgangs nicht verhindern.
+    Request soll den Rest des Durchgangs nicht verhindern. Bei HTTP 429 wird bis
+    zu MAX_RETRIES Mal erneut versucht (Backoff via Retry-After-Header, falls
+    vorhanden, sonst RETRY_WAIT_FALLBACK).
     """
     url = f"{BASE_URL}{path}"
     headers = {"User-Agent": user_agent}
     params = {"limit": limit}
 
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        root = ET.fromstring(response.text)
-    except (requests.RequestException, ET.ParseError) as exc:
-        print(f"WARNUNG: Konnte {url} nicht laden ({exc}). Ueberspringe.", file=sys.stderr)
-        return []
+    attempt = 0
+    while True:
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+            if response.status_code == 429 and attempt < MAX_RETRIES:
+                wait = RETRY_WAIT_FALLBACK
+                retry_after = response.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    wait = int(retry_after)
+                wait = min(wait, RETRY_WAIT_CAP)
+                attempt += 1
+                print(
+                    f"WARNUNG: {url} antwortete mit 429, versuche in {wait}s erneut "
+                    f"(Versuch {attempt}/{MAX_RETRIES})...",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+            break
+        except (requests.RequestException, ET.ParseError) as exc:
+            print(f"WARNUNG: Konnte {url} nicht laden ({exc}). Ueberspringe.", file=sys.stderr)
+            return []
 
     entries = []
     for entry in root.findall("atom:entry", ATOM_NS):
