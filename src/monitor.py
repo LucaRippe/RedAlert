@@ -1,23 +1,38 @@
 """Hauptskript: durchsucht Reddit nach Keyword-Treffern und alarmiert via Discord.
 
+Nutzt Reddits oeffentliche, unauthentifizierte Atom/RSS-Feeds (z. B.
+reddit.com/r/<sub>/new.rss) statt der offiziellen OAuth-API. Grund: Reddit hat
+die Selbstregistrierung fuer neue API-Apps geschlossen (Responsible Builder
+Policy, Stand 2026); der Zugriffsantrag fuer dieses persoenliche Projekt wurde
+abgelehnt.
+
+Wichtig: die frueher ueblichen `.json`-Endpunkte (z. B. `new.json`) sind
+inzwischen fuer unauthentifizierte Anfragen hart geblockt (HTTP 403, auch mit
+plausiblem Browser-User-Agent) - das wurde beim Bau dieses Skripts live
+verifiziert. Die `.rss`-Endpunkte (Atom-Feeds) funktionieren dagegen weiterhin
+mit einem ehrlichen, nicht-generischen User-Agent. Beide Varianten sind
+inoffiziell/nicht supported, koennen sich jederzeit aendern und unterliegen
+strengerem, undokumentiertem Rate-Limiting als die offizielle API - deshalb ist
+dieses Skript defensiv gebaut: ein fehlgeschlagener oder nicht parsebarer
+Request bricht den Lauf nicht ab, sondern wird uebersprungen und geloggt.
+
 Laeuft als kurzlebiger Prozess (gedacht fuer periodische Ausfuehrung via GitHub
-Actions). Statt PRAWs Streaming-Generatoren (subreddit.stream.submissions() /
-.comments()) - die auf Endlosbetrieb ausgelegt sind und blockieren, bis neue
-Items eintreffen - macht dieses Skript pro Lauf einen einzigen begrenzten
-Durchgang ueber die neuesten Posts/Kommentare (subreddit.new() / .comments())
-und verlaesst sich auf seen_ids.json fuer die Deduplizierung ueber Laeufe
-hinweg. Das ist die passende Form fuer "alle N Minuten aufwachen, nachsehen
-was neu ist, beenden" statt eines dauerhaft laufenden Prozesses.
+Actions): ein begrenzter Durchgang pro Lauf ueber die neuesten Posts/Kommentare,
+Dedup ueber seen_ids.json.
 """
 
 from __future__ import annotations
 
+import html
 import json
 import os
+import re
 import sys
+import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import praw
+import requests
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,6 +47,16 @@ CONFIG_PATH = ROOT / "config.yaml"
 MAX_SEEN_IDS = 5000
 POST_LIMIT = 100
 COMMENT_LIMIT = 100
+REQUEST_TIMEOUT = 15
+DELAY_BETWEEN_REQUESTS = 5  # Sekunden Pause zwischen den beiden Requests, aus
+# Ruecksicht auf das strengere, undokumentierte Rate-Limiting unauthentifizierter
+# Zugriffe (beim Testen wurde nach mehreren schnellen Anfragen kurzzeitig ein
+# HTTP 429 beobachtet; bei einem Lauf alle 45 Minuten mit nur 2 Requests ist das
+# unkritisch, die Pause ist trotzdem ein guter Nachbar).
+
+BASE_URL = "https://www.reddit.com"
+ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def load_config() -> dict:
@@ -51,74 +76,114 @@ def save_seen_ids(seen_ids: list[str]) -> None:
     SEEN_IDS_PATH.write_text(json.dumps(trimmed, indent=2) + "\n", encoding="utf-8")
 
 
-def build_reddit_client() -> praw.Reddit:
-    return praw.Reddit(
-        client_id=os.environ["REDDIT_CLIENT_ID"],
-        client_secret=os.environ["REDDIT_CLIENT_SECRET"],
-        user_agent=os.environ["REDDIT_USER_AGENT"],
-    )
-
-
-def target_subreddit_name(config: dict) -> str:
+def target_subreddit_path(config: dict) -> str:
     if config.get("search_all", False):
         return "all"
     subreddits = config.get("subreddits") or ["all"]
     return "+".join(subreddits)
 
 
+def _clean_html(raw: str) -> str:
+    """Entfernt HTML-Tags und loest Entities aus Reddits <content>-Feld auf."""
+    text = _TAG_RE.sub(" ", raw or "")
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def fetch_feed(path: str, user_agent: str, limit: int) -> list[dict]:
+    """Holt einen Reddit-Atom-Feed (.rss) und gibt normalisierte Eintraege zurueck.
+
+    Gibt bei Fehlern (Netzwerk, Rate-Limit, kaputtes XML) eine leere Liste
+    zurueck statt den ganzen Lauf abzubrechen - ein einzelner fehlgeschlagener
+    Request soll den Rest des Durchgangs nicht verhindern.
+    """
+    url = f"{BASE_URL}{path}"
+    headers = {"User-Agent": user_agent}
+    params = {"limit": limit}
+
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+    except (requests.RequestException, ET.ParseError) as exc:
+        print(f"WARNUNG: Konnte {url} nicht laden ({exc}). Ueberspringe.", file=sys.stderr)
+        return []
+
+    entries = []
+    for entry in root.findall("atom:entry", ATOM_NS):
+        category = entry.find("atom:category", ATOM_NS)
+        link = entry.find("atom:link", ATOM_NS)
+        author = entry.findtext("atom:author/atom:name", default="", namespaces=ATOM_NS)
+        entries.append(
+            {
+                "id": entry.findtext("atom:id", default="", namespaces=ATOM_NS),
+                "title": entry.findtext("atom:title", default="", namespaces=ATOM_NS),
+                "subreddit": category.get("term") if category is not None else "?",
+                "author": author.removeprefix("/u/") if author else None,
+                "link": link.get("href") if link is not None else "",
+                "content": _clean_html(entry.findtext("atom:content", default="", namespaces=ATOM_NS)),
+            }
+        )
+    return entries
+
+
 def main() -> int:
     webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
+    user_agent = os.environ["REDDIT_USER_AGENT"]
     config = load_config()
     groups = load_keyword_groups(KEYWORDS_PATH)
 
     seen_ids_list = load_seen_ids()
     seen_ids_set = set(seen_ids_list)
 
-    reddit = build_reddit_client()
-    reddit.read_only = True
-    subreddit = reddit.subreddit(target_subreddit_name(config))
-
+    subreddit_path = target_subreddit_path(config)
     checked_count = 0
     alert_count = 0
 
     # --- Posts (Titel + Body) ---
-    for submission in subreddit.new(limit=POST_LIMIT):
-        if submission.id in seen_ids_set:
+    posts = fetch_feed(f"/r/{subreddit_path}/new.rss", user_agent, POST_LIMIT)
+    for post in posts:
+        post_id = post["id"] or post["link"]
+        if not post_id or post_id in seen_ids_set:
             continue
-        seen_ids_set.add(submission.id)
-        seen_ids_list.append(submission.id)
+        seen_ids_set.add(post_id)
+        seen_ids_list.append(post_id)
         checked_count += 1
 
-        text = f"{submission.title}\n{submission.selftext or ''}"
+        text = f"{post['title']}\n{post['content']}"
         for group_name in find_matches(text, groups):
             send_alert(
                 webhook_url,
                 keyword_group=group_name,
-                subreddit=str(submission.subreddit),
+                subreddit=post["subreddit"],
                 kind="post",
-                title_or_excerpt=submission.title,
-                url=f"https://reddit.com{submission.permalink}",
-                author=str(submission.author) if submission.author else None,
+                title_or_excerpt=post["title"],
+                url=post["link"],
+                author=post["author"],
             )
             alert_count += 1
 
+    time.sleep(DELAY_BETWEEN_REQUESTS)
+
     # --- Kommentare ---
-    for comment in subreddit.comments(limit=COMMENT_LIMIT):
-        if comment.id in seen_ids_set:
+    comments = fetch_feed(f"/r/{subreddit_path}/comments.rss", user_agent, COMMENT_LIMIT)
+    for comment in comments:
+        comment_id = comment["id"] or comment["link"]
+        if not comment_id or comment_id in seen_ids_set:
             continue
-        seen_ids_set.add(comment.id)
-        seen_ids_list.append(comment.id)
+        seen_ids_set.add(comment_id)
+        seen_ids_list.append(comment_id)
         checked_count += 1
 
-        for group_name in find_matches(comment.body or "", groups):
+        for group_name in find_matches(comment["content"], groups):
             send_alert(
                 webhook_url,
                 keyword_group=group_name,
-                subreddit=str(comment.subreddit),
+                subreddit=comment["subreddit"],
                 kind="comment",
-                title_or_excerpt=comment.body or "",
-                url=f"https://reddit.com{comment.permalink}",
-                author=str(comment.author) if comment.author else None,
+                title_or_excerpt=comment["content"],
+                url=comment["link"],
+                author=comment["author"],
             )
             alert_count += 1
 

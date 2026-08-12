@@ -7,44 +7,66 @@ eine Nachricht an einen Discord-Webhook.
 
 Laeuft komplett auf GitHub Actions, kein eigener Server, keine laufenden Kosten.
 
+## Hinweis zum Reddit-Zugriff
+
+Dieses Projekt nutzt **Reddits oeffentliche, unauthentifizierte Atom/RSS-Feeds**
+(z. B. `reddit.com/r/<sub>/new.rss`) statt der offiziellen OAuth-API. Grund: Reddit
+hat die Selbstregistrierung neuer API-Apps geschlossen (Responsible Builder Policy,
+Stand 2026) und verlangt seither eine vorherige Genehmigung per Support-Ticket; der
+Antrag fuer dieses persoenliche Projekt wurde abgelehnt.
+
+Beim Bau wurde live getestet, dass die frueher ueblichen `.json`-Endpunkte
+(`new.json` etc.) fuer unauthentifizierte Anfragen inzwischen **hart geblockt sind**
+(HTTP 403, auch mit plausiblem Browser-User-Agent). Die `.rss`-Endpunkte
+funktionieren dagegen weiterhin mit einem ehrlichen, nicht-generischen User-Agent —
+`monitor.py` nutzt deshalb diese. Das heisst konkret:
+
+- Auch die `.rss`-Endpunkte sind inoffiziell und nicht supported — sie koennen sich
+  jederzeit ohne Vorwarnung aendern, weiter eingeschraenkt oder abgeschaltet werden.
+- Sie unterliegen einem strengeren, undokumentierten Rate-Limiting als die offizielle
+  API (beim Testen wurde nach mehreren schnellen Anfragen kurzzeitig ein HTTP 429
+  beobachtet). Der Workflow macht pro Lauf nur zwei Requests, das sollte unkritisch
+  sein.
+- `monitor.py` ist entsprechend defensiv gebaut: ein fehlgeschlagener oder nicht
+  parsebarer Request bricht den Lauf nicht ab, sondern wird uebersprungen und
+  geloggt.
+
+**Bevor du das dauerhaft laufen laesst**, pruefe selbst kurz Reddits aktuelle
+Nutzungsbedingungen und die [Responsible Builder Policy](https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy)
+dazu, ob und wie automatisierter Zugriff auf diese oeffentlichen Endpunkte erlaubt
+ist. Diese Anleitung ersetzt keine eigene Pruefung der ToS. Falls du spaeter doch noch
+offiziellen API-Zugriff bekommst (z. B. nach einem erneuten Antrag), lohnt es sich,
+wieder auf die offizielle OAuth-API mit PRAW umzustellen — zuverlaessiger und
+ToS-konform per Definition.
+
 ## Setup
 
-### 1. Reddit-App registrieren
-
-1. Gehe zu [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps).
-2. "create app" (bzw. "create another app") klicken.
-3. Typ **"script"** waehlen.
-4. Name frei waehlbar, "redirect uri" kann z. B. `http://localhost:8080` sein.
-5. Nach dem Erstellen findest du direkt unter dem App-Namen die `client_id`
-   (kurze Zeichenfolge) und daneben das `secret`.
-
-### 2. Discord-Webhook erstellen
+### 1. Discord-Webhook erstellen
 
 1. In einem Discord-Server (auch ein privater Server nur fuer dich reicht) →
    Kanaleinstellungen des Zielkanals → **Integrationen** → **Webhook erstellen**.
 2. Webhook-URL kopieren.
 
-### 3. GitHub Actions Secrets hinterlegen
+### 2. GitHub Actions Secrets hinterlegen
 
 Im Repo unter **Settings → Secrets and variables → Actions → New repository secret**
-folgende vier Secrets anlegen:
+folgende zwei Secrets anlegen:
 
 | Secret | Wert |
 | --- | --- |
-| `REDDIT_CLIENT_ID` | `client_id` aus Schritt 1 |
-| `REDDIT_CLIENT_SECRET` | `secret` aus Schritt 1 |
 | `REDDIT_USER_AGENT` | z. B. `redalert-keyword-monitor/1.0 by u/<dein-reddit-username>` |
-| `DISCORD_WEBHOOK_URL` | Webhook-URL aus Schritt 2 |
+| `DISCORD_WEBHOOK_URL` | Webhook-URL aus Schritt 1 |
 
-`REDDIT_USER_AGENT` sollte aussagekraeftig und ehrlich sein, kein generischer String —
-Reddit verlangt das fuer API-Zugriffe.
+`REDDIT_USER_AGENT` sollte aussagekraeftig und ehrlich sein, kein generischer String
+wie der Standard-User-Agent von `requests` — Reddit blockt solche Anfragen deutlich
+haeufiger, gerade bei unauthentifiziertem Zugriff.
 
-### 4. Testlauf
+### 3. Testlauf
 
 Nach dem Push: im Reiter **Actions** den Workflow **"Reddit Keyword Monitor"** oeffnen
 und ueber **"Run workflow"** (workflow_dispatch) manuell starten, statt auf den
 naechsten Cron-Lauf zu warten. Im Log siehst du, wie viele neue Items geprueft und wie
-viele Alerts gesendet wurden.
+viele Alerts gesendet wurden (bzw. ob Requests fehlgeschlagen sind).
 
 ## Keywords konfigurieren
 
@@ -84,19 +106,13 @@ search_all: false
 ## Wie es funktioniert
 
 - Alle 45 Minuten (Cron) bzw. manuell via `workflow_dispatch` prueft der Workflow die
-  neuesten Posts (Titel + Body) und Kommentare der konfigurierten Subreddits.
+  neuesten Posts (Titel + Body) und Kommentare der konfigurierten Subreddits ueber
+  Reddits oeffentliche `.rss`-Feeds (Atom-Format).
 - Bereits gemeldete IDs stehen in [seen_ids.json](seen_ids.json) (auf die letzten 5.000
   Eintraege begrenzt) und werden nach jedem Lauf automatisch zurueck ins Repo
   committet — das verhindert doppelte Alerts, ganz ohne externe Datenbank.
 - Bei einem Treffer wird eine Discord-Nachricht (Embed) mit Keyword-Gruppe, Subreddit,
   Ausschnitt und direktem Link verschickt.
-
-**Hinweis zur Implementierung:** Das Skript nutzt PRAWs `.new()` / `.comments()`
-Listings statt der Streaming-Funktionen (`stream.submissions()` / `stream.comments()`).
-Die Streaming-Funktionen sind fuer dauerhaft laufende Prozesse gedacht und blockieren
-unbegrenzt — das passt nicht zu einem kurzlebigen GitHub-Actions-Job, der alle paar
-Minuten neu startet. Ein begrenzter Durchgang pro Lauf plus Dedup ueber
-`seen_ids.json` erreicht dasselbe Ergebnis zuverlaessiger in diesem Kontext.
 
 ## Projektstruktur
 
@@ -116,14 +132,6 @@ RedAlert/
 └── README.md
 ```
 
-## Wichtiger Hinweis zu Reddits Nutzungsbedingungen
-
-Bevor du das Projekt dauerhaft laufen laesst: pruefe selbst kurz Reddits aktuelle
-Developer-Terms ([reddit.com/wiki/api-terms](https://www.reddit.com/wiki/api-terms)
-bzw. die dort verlinkten aktuellen Bedingungen), insbesondere zu erlaubter
-Abfragefrequenz und zulaessigen Anwendungsfaellen fuer ein "script"-App-Konto. Diese
-Anleitung ersetzt keine eigene Pruefung der ToS.
-
 ## Lokal entwickeln / testen
 
 ```bash
@@ -132,7 +140,6 @@ pip install pytest
 pytest tests/
 ```
 
-Fuer einen lokalen Testlauf des Monitors selbst muessen die vier Umgebungsvariablen
-(`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`,
-`DISCORD_WEBHOOK_URL`) gesetzt sein, z. B. per `.env` + `export $(cat .env | xargs)`
-oder direkt im Terminal.
+Fuer einen lokalen Testlauf des Monitors selbst muessen die zwei Umgebungsvariablen
+(`REDDIT_USER_AGENT`, `DISCORD_WEBHOOK_URL`) gesetzt sein, z. B. per `.env` +
+`export $(cat .env | xargs)` oder direkt im Terminal.
