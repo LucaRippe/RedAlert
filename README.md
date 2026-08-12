@@ -98,6 +98,19 @@ Code-Aenderung erweitern. Jeder Eintrag ist eine Gruppe:
   Phrasen vorkommt.
 - **case_sensitive** (optional, Standard `false`): Gross-/Kleinschreibung beachten.
 
+**Kurzform fuer einzelne Ad-hoc-Keywords:** statt der vollen Gruppen-Struktur reicht
+auch ein nackter String als Eintrag:
+
+```yaml
+- "reference manager"
+```
+
+Das erzeugt automatisch eine Gruppe mit der Phrase selbst als Name und genau dieser
+einen Phrase in `match_any` (kein `exclude_any`, case-insensitiv). Praktisch, um
+schnell ein einzelnes Wort zu beobachten, ohne die name/match_any-Struktur
+auszufuellen — String- und Gruppen-Eintraege lassen sich in derselben Datei beliebig
+mischen.
+
 ## Subreddits konfigurieren
 
 In [config.yaml](config.yaml) laesst sich einstellen, ob eine kuratierte

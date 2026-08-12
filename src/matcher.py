@@ -4,6 +4,12 @@ Laedt Gruppen aus keywords.yaml und prueft freien Text dagegen. Eine Gruppe
 matcht, wenn IRGENDEINE Phrase aus match_any als Teilstring im Text vorkommt
 (gross-/kleinschreibungsunabhaengig, ausser case_sensitive: true ist gesetzt)
 und KEINE Phrase aus exclude_any vorkommt.
+
+Jeder Eintrag in keywords.yaml ist entweder eine volle Gruppe (dict mit 'name'
+und 'match_any', optional 'exclude_any'/'case_sensitive') oder - als Kurzform
+fuer ein einzelnes Ad-hoc-Keyword ohne exclude_any-Bedarf - einfach ein nackter
+String. Ein String-Eintrag wird zu einer Gruppe, deren Name die Phrase selbst
+ist und die genau diese eine Phrase in match_any hat.
 """
 
 from __future__ import annotations
@@ -39,6 +45,11 @@ def load_keyword_groups(path: str | Path) -> list[KeywordGroup]:
 
     groups: list[KeywordGroup] = []
     for entry in raw:
+        if isinstance(entry, str):
+            # Kurzform: ein nacktes Keyword ohne umgebende Gruppen-Struktur.
+            groups.append(KeywordGroup(name=entry, match_any=[entry]))
+            continue
+
         if "name" not in entry or "match_any" not in entry:
             raise ValueError(f"Ungueltige Keyword-Gruppe (braucht 'name' und 'match_any'): {entry}")
         groups.append(

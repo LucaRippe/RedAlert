@@ -54,3 +54,25 @@ def test_load_keyword_groups_from_yaml(tmp_path):
     assert groups[0].name == "Test Group"
     assert groups[0].matches("say Hello World please")
     assert not groups[0].matches("Hello World but this is spam")
+
+
+def test_load_keyword_groups_shorthand_string_entry(tmp_path):
+    yaml_content = """
+- "reference manager"
+- name: "Full Group"
+  match_any:
+    - "full group phrase"
+"""
+    yaml_path = tmp_path / "keywords.yaml"
+    yaml_path.write_text(yaml_content, encoding="utf-8")
+
+    groups = load_keyword_groups(yaml_path)
+    assert len(groups) == 2
+
+    shorthand = groups[0]
+    assert shorthand.name == "reference manager"
+    assert shorthand.match_any == ["reference manager"]
+    assert shorthand.matches("Looking for a good Reference Manager")
+    assert not shorthand.matches("no relevant words here")
+
+    assert groups[1].name == "Full Group"

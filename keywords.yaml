@@ -12,6 +12,13 @@
 #
 # Diese Datei kannst du beliebig erweitern, ohne Code anzufassen - einfach neue
 # Eintraege nach demselben Muster hinzufuegen.
+#
+# Kurzform fuer einzelne Ad-hoc-Keywords: statt einer vollen Gruppe reicht auch
+# einfach ein nackter String als Eintrag, z. B. "reference manager". Der wird
+# automatisch zu einer eigenen Gruppe (Name = die Phrase selbst, match_any = nur
+# diese eine Phrase, kein exclude_any, case-insensitiv). Praktisch zum schnellen
+# Ausprobieren einzelner Woerter, ohne die name/match_any-Struktur auszufuellen.
+# Siehe Beispiel ganz unten in dieser Datei.
 
 - name: "Litmaps Alternative"
   match_any:
@@ -49,3 +56,6 @@
     - "job posting"
     - "hiring"
   case_sensitive: false
+
+# Beispiel fuer die Kurzform (Ad-hoc-Keyword ohne Gruppen-Boilerplate):
+# - "reference manager"
