@@ -1,10 +1,13 @@
-"""Versand von Discord-Webhook-Benachrichtigungen."""
+"""Versand von Telegram-Benachrichtigungen ueber die Bot-API."""
 
 from __future__ import annotations
+
+import html
 
 import requests
 
 MAX_EXCERPT_LEN = 200
+TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
 
 def _truncate(text: str, length: int = MAX_EXCERPT_LEN) -> str:
@@ -15,7 +18,8 @@ def _truncate(text: str, length: int = MAX_EXCERPT_LEN) -> str:
 
 
 def send_alert(
-    webhook_url: str,
+    bot_token: str,
+    chat_id: str,
     *,
     keyword_group: str,
     subreddit: str,
@@ -24,18 +28,26 @@ def send_alert(
     url: str,
     author: str | None = None,
 ) -> None:
-    """Sendet einen einzelnen Treffer als Discord-Embed."""
-    embed = {
-        "title": f"\U0001f514 {keyword_group}",
-        "description": _truncate(title_or_excerpt),
-        "url": url,
-        "color": 0xFF4500,  # reddit-orange
-        "fields": [
-            {"name": "Subreddit", "value": f"r/{subreddit}", "inline": True},
-            {"name": "Typ", "value": "Post" if kind == "post" else "Kommentar", "inline": True},
-        ],
-        "footer": {"text": f"u/{author}" if author else "reddit-listener"},
-    }
+    """Sendet einen einzelnen Treffer als Telegram-Nachricht (HTML-formatiert)."""
+    type_label = "Post" if kind == "post" else "Kommentar"
+    excerpt = html.escape(_truncate(title_or_excerpt))
+    author_line = f"\nvon u/{html.escape(author)}" if author else ""
 
-    response = requests.post(webhook_url, json={"embeds": [embed]}, timeout=15)
+    text = (
+        f"\U0001f514 <b>{html.escape(keyword_group)}</b>\n"
+        f"r/{html.escape(subreddit)} · {type_label}\n\n"
+        f"{excerpt}{author_line}\n\n"
+        f'<a href="{html.escape(url)}">Zum Beitrag</a>'
+    )
+
+    response = requests.post(
+        TELEGRAM_API_URL.format(token=bot_token),
+        json={
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": False,
+        },
+        timeout=15,
+    )
     response.raise_for_status()

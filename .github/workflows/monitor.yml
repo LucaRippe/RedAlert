@@ -35,7 +35,8 @@ jobs:
       - name: Monitor ausfuehren
         env:
           REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python src/monitor.py
 
       - name: seen_ids.json committen

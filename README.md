@@ -3,7 +3,7 @@
 Eigener Reddit-Keyword-Listener als F5Bot-Ersatz: durchsucht periodisch Reddit nach
 konfigurierbaren Keyword-Mustern (beliebig viele Keywords, Teilstring-Matching,
 Ausschlussbegriffe, mehrere Formulierungen pro Thema) und schickt bei neuen Treffern
-eine Nachricht an einen Discord-Webhook.
+eine Nachricht per Telegram-Bot.
 
 Laeuft komplett auf GitHub Actions, kein eigener Server, keine laufenden Kosten.
 
@@ -41,21 +41,32 @@ ToS-konform per Definition.
 
 ## Setup
 
-### 1. Discord-Webhook erstellen
+### 1. Telegram-Bot erstellen
 
-1. In einem Discord-Server (auch ein privater Server nur fuer dich reicht) →
-   Kanaleinstellungen des Zielkanals → **Integrationen** → **Webhook erstellen**.
-2. Webhook-URL kopieren.
+1. In Telegram den offiziellen [@BotFather](https://t.me/BotFather) oeffnen und
+   `/newbot` schicken.
+2. Namen und Username vergeben (Username muss auf `bot` enden, z. B.
+   `redalert_keyword_bot`).
+3. BotFather antwortet mit dem **Bot-Token** (Format `123456789:AA...`) — kopieren.
+4. Dem neuen Bot eine beliebige Nachricht schicken (z. B. `/start`), damit er weiss,
+   dass er dir schreiben darf. Ohne diesen Schritt kann der Bot dir keine
+   Nachrichten senden.
+5. Deine **Chat-ID** herausfinden: im Browser
+   `https://api.telegram.org/bot<DEIN_BOT_TOKEN>/getUpdates` aufrufen (Token
+   einsetzen), nachdem du dem Bot geschrieben hast. In der JSON-Antwort steht unter
+   `"message":{"chat":{"id": ...}}` deine Chat-ID (eine Zahl, ggf. negativ falls es
+   eine Gruppe statt eines Privatchats ist).
 
 ### 2. GitHub Actions Secrets hinterlegen
 
 Im Repo unter **Settings → Secrets and variables → Actions → New repository secret**
-folgende zwei Secrets anlegen:
+folgende drei Secrets anlegen:
 
 | Secret | Wert |
 | --- | --- |
 | `REDDIT_USER_AGENT` | z. B. `redalert-keyword-monitor/1.0 by u/<dein-reddit-username>` |
-| `DISCORD_WEBHOOK_URL` | Webhook-URL aus Schritt 1 |
+| `TELEGRAM_BOT_TOKEN` | Bot-Token aus Schritt 1 |
+| `TELEGRAM_CHAT_ID` | Chat-ID aus Schritt 1 |
 
 `REDDIT_USER_AGENT` sollte aussagekraeftig und ehrlich sein, kein generischer String
 wie der Standard-User-Agent von `requests` — Reddit blockt solche Anfragen deutlich
@@ -111,7 +122,7 @@ search_all: false
 - Bereits gemeldete IDs stehen in [seen_ids.json](seen_ids.json) (auf die letzten 5.000
   Eintraege begrenzt) und werden nach jedem Lauf automatisch zurueck ins Repo
   committet — das verhindert doppelte Alerts, ganz ohne externe Datenbank.
-- Bei einem Treffer wird eine Discord-Nachricht (Embed) mit Keyword-Gruppe, Subreddit,
+- Bei einem Treffer wird eine Telegram-Nachricht mit Keyword-Gruppe, Subreddit,
   Ausschnitt und direktem Link verschickt.
 
 ## Projektstruktur
@@ -125,7 +136,7 @@ RedAlert/
 ├── src/
 │   ├── monitor.py                  # Hauptskript
 │   ├── matcher.py                  # Keyword-Matching-Logik
-│   └── notifier.py                 # Discord-Webhook-Versand
+│   └── notifier.py                 # Telegram-Benachrichtigungen
 ├── tests/
 │   └── test_matcher.py             # Unit-Tests fuer das Matching
 ├── requirements.txt
@@ -140,6 +151,6 @@ pip install pytest
 pytest tests/
 ```
 
-Fuer einen lokalen Testlauf des Monitors selbst muessen die zwei Umgebungsvariablen
-(`REDDIT_USER_AGENT`, `DISCORD_WEBHOOK_URL`) gesetzt sein, z. B. per `.env` +
-`export $(cat .env | xargs)` oder direkt im Terminal.
+Fuer einen lokalen Testlauf des Monitors selbst muessen die drei Umgebungsvariablen
+(`REDDIT_USER_AGENT`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) gesetzt sein, z. B.
+per `.env` + `export $(cat .env | xargs)` oder direkt im Terminal.

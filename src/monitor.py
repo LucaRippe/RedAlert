@@ -1,4 +1,4 @@
-"""Hauptskript: durchsucht Reddit nach Keyword-Treffern und alarmiert via Discord.
+"""Hauptskript: durchsucht Reddit nach Keyword-Treffern und alarmiert via Telegram.
 
 Nutzt Reddits oeffentliche, unauthentifizierte Atom/RSS-Feeds (z. B.
 reddit.com/r/<sub>/new.rss) statt der offiziellen OAuth-API. Grund: Reddit hat
@@ -128,7 +128,8 @@ def fetch_feed(path: str, user_agent: str, limit: int) -> list[dict]:
 
 
 def main() -> int:
-    webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
+    bot_token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
     user_agent = os.environ["REDDIT_USER_AGENT"]
     config = load_config()
     groups = load_keyword_groups(KEYWORDS_PATH)
@@ -153,7 +154,8 @@ def main() -> int:
         text = f"{post['title']}\n{post['content']}"
         for group_name in find_matches(text, groups):
             send_alert(
-                webhook_url,
+                bot_token,
+                chat_id,
                 keyword_group=group_name,
                 subreddit=post["subreddit"],
                 kind="post",
@@ -177,7 +179,8 @@ def main() -> int:
 
         for group_name in find_matches(comment["content"], groups):
             send_alert(
-                webhook_url,
+                bot_token,
+                chat_id,
                 keyword_group=group_name,
                 subreddit=comment["subreddit"],
                 kind="comment",
